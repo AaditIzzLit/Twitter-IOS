@@ -13,34 +13,48 @@ class HomeTableViewController: UITableViewController {
 
     
     var tweetArray = [NSDictionary]()
-    var numberOfTweets : Int!
+    var numberOfTweets : Int = 20
+    let myRefreshControl = UIRefreshControl()
     override func viewDidLoad() {
         super.viewDidLoad()
-        loadTweet()
+        myRefreshControl.addTarget(self, action: #selector(loadTweet), for: .valueChanged)
+        tableView.refreshControl = myRefreshControl
         // Uncomment the following line to preserve selection between presentations
         // self.clearsSelectionOnViewWillAppear = false
 
         // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
         // self.navigationItem.rightBarButtonItem = self.editButtonItem
+        self.tableView.rowHeight = UITableView.automaticDimension
+        self.tableView.estimatedRowHeight = 150
     }
 
     // MARK: - Table view data source
-
+     override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        loadTweet()
+    }
     
-    func loadTweet() {
+    @objc func loadTweet() {
         
         let myURL = "https://api.twitter.com/1.1/statuses/home_timeline.json"
-        let params = ["count":10]
+        let params = ["count": numberOfTweets]
         TwitterAPICaller.client?.getDictionariesRequest(url: myURL, parameters: params, success: { (tweets : [NSDictionary]) in
             self.tweetArray.removeAll()
             for tweet in tweets {
                 self.tweetArray.append(tweet)
             }
             self.tableView.reloadData()
+            self.myRefreshControl.endRefreshing()
         }, failure: { (Error) in
             print("Could not retrive tweets")
         })
     }
+    
+    func loadMoreTweets() {
+        numberOfTweets = numberOfTweets + 20
+        loadTweet()
+    }
+
     @IBAction func onLogout(_ sender: Any) {
         TwitterAPICaller.client?.logout()
         self.dismiss(animated: true, completion: nil)
@@ -59,6 +73,11 @@ class HomeTableViewController: UITableViewController {
         }
         cell.userContent.text = user["name"] as? String
         cell.tweetContent.text = tweet["text"] as? String
+        cell.likesCount = tweetArray[indexPath.row]["favorite_count"] as! Int
+        cell.setFavorite(tweetArray[indexPath.row]["favorited"] as! Bool, cell.likesCount)
+        cell.tweetId = tweetArray[indexPath.row]["id"] as! Int
+        cell.retweetCount = tweetArray[indexPath.row]["retweet_count"] as! Int
+        cell.setRetweeted(tweetArray[indexPath.row]["retweeted"] as! Bool, cell.retweetCount)
         return cell
     }
     override func numberOfSections(in tableView: UITableView) -> Int {
@@ -69,6 +88,12 @@ class HomeTableViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
         return tweetArray.count
+    }
+    
+    override func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        if(indexPath.row + 1 == tweetArray.count) {
+            loadMoreTweets()
+        }
     }
 
     /*
